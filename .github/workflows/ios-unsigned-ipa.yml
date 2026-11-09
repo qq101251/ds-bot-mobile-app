@@ -44,13 +44,13 @@ jobs:
         run: |
           set -euo pipefail
           WORKSPACE=$(ls -d *.xcworkspace | head -n1)
-          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json 2>/dev/null \
-            | python3 -c 'import json,sys; s=json.load(sys.stdin)["workspace"]["schemes"]; c=[x for x in s if not x.startswith("Pods-")]; print(c[0])')
-          echo "workspace=$WORKSPACE scheme=$SCHEME"
-          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
+          APP_NAME=$(basename "$(ls -d *.xcodeproj | head -n1)" .xcodeproj)
+          echo "workspace=$WORKSPACE app=$APP_NAME"
+          xcodebuild -workspace "$WORKSPACE" -list
+          xcodebuild -workspace "$WORKSPACE" -scheme "$APP_NAME" \
             -configuration Release -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -archivePath "$PWD/build/DSBotMobile.xcarchive" \
+            -archivePath "$PWD/build/$APP_NAME.xcarchive" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS="" \
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
@@ -61,8 +61,11 @@ jobs:
       - name: Package unsigned ipa
         run: |
           set -euo pipefail
-          APP=$(find apps/mobile/ios/build/DSBotMobile.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -n1)
+          ARCHIVE=$(find apps/mobile/ios/build -maxdepth 1 -name '*.xcarchive' | head -n1)
+          echo "archive=$ARCHIVE"
+          APP=$(find "$ARCHIVE/Products/Applications" -maxdepth 1 -name '*.app' | head -n1)
           echo "app=$APP"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist" || true
           mkdir -p out/Payload
           cp -R "$APP" out/Payload/
           cd out
